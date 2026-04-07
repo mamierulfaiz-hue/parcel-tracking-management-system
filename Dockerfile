@@ -1,19 +1,23 @@
-# Use a PHP image that includes Nginx
 FROM richarvey/nginx-php-fpm:3.1.6
 
-# Copy all your Laravel files into the server
+# 1. Copy all project files
 COPY . /var/www/html
 
-RUN composer install --no-dev --optimize-autoloader
-
-# Set the working folder
+# 2. Set working directory
 WORKDIR /var/www/html
 
-# Set the web root to Laravel's public folder
+# 3. Install dependencies 
+# We add --ignore-platform-reqs to avoid errors if a PHP extension is missing in the image
+RUN composer install --no-dev --optimize-autoloader --ignore-platform-reqs
+
+# 4. Set permissions for Laravel
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# 5. Configure the web server
 ENV WEBROOT /var/www/html/public
+ENV APP_ENV production
+ENV SKIP_COMPOSER 1
+ENV PHP_ERRORS_STDERR 1
 
-# Allow the server to use port 80
 EXPOSE 80
-
-# Start the server
 CMD ["/start.sh"]
