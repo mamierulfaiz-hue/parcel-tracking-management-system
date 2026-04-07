@@ -11,13 +11,16 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        // 👇 THIS IS THE NEW PART 👇
+    ->withMiddleware(function (Middleware $middleware) {
+        // 1. TRUST PROXIES (Fixes the 404/Login Redirect issue on Render)
+        $middleware->trustProxies(at: '*');
+
+        // 2. KEEP YOUR PREVIOUS CODE (Raspberry Pi CSRF)
         $middleware->validateCsrfTokens(except: [
-            'api/scan-parcel',  // Allows the Pi to send scan data
-            'api/store-parcel', // Optional: Allows adding parcels later
+            'api/scan-parcel',
+            'api/store-parcel',
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();
