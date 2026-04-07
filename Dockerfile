@@ -7,7 +7,6 @@ COPY . /var/www/html
 WORKDIR /var/www/html
 
 # 3. Install dependencies 
-# We add --ignore-platform-reqs to avoid errors if a PHP extension is missing in the image
 RUN composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
 # 4. Set permissions for Laravel
@@ -20,4 +19,6 @@ ENV SKIP_COMPOSER 1
 ENV PHP_ERRORS_STDERR 1
 
 EXPOSE 80
-CMD ["/start.sh"]
+
+# THE FIX: Run migration, then start the server
+CMD sh -c "php artisan migrate --force && /start.sh"
