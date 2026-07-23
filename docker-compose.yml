@@ -67,7 +67,7 @@ services:
       DB_DATABASE: parcel_system
       DB_USERNAME: root
       DB_PASSWORD: secret
-      TELEGRAM_BOT_TOKEN: "8429451091:AAEVMdjBs3X0be_zkJad9Qbbj6u_7KSG0ac"
+      TELEGRAM_BOT_TOKEN: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
     depends_on:
       db:
         condition: service_healthy
