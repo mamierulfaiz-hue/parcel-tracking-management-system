@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use App\Models\Parcel;
 use App\Models\Student;
 use App\Models\Shelf;
@@ -75,6 +76,31 @@ Route::middleware(['auth'])->group(function () {
         return back()->with('success', 'Student Removed');
     });
 
+    Route::put('/admin/update-student/{id}', function (Request $request, $id) {
+        $student = Student::findOrFail($id);
+
+        $request->validate([
+            'name' => 'required',
+            'student_id' => [
+                'required',
+                Rule::unique('students')->ignore($student->id),
+            ],
+            'phone' => 'required',
+            'room_number' => 'required',
+            'ic_number' => 'required',
+        ]);
+
+        $student->update([
+            'name' => $request->name,
+            'student_id' => $request->student_id,
+            'phone' => $request->phone,
+            'room_number' => $request->room_number,
+            'ic_number' => $request->ic_number,
+        ]);
+
+        return back()->with('success', 'Student details updated successfully');
+    });
+
     Route::get('/admin/check-parcel-details/{unique_id}', function ($unique_id) {
         $parcel = Parcel::where('unique_id', $unique_id)->first();
         if (!$parcel) return response()->json(['status' => 'error', 'message' => 'Parcel ID Not Found!']);
@@ -118,9 +144,22 @@ Route::middleware(['auth:student'])->prefix('student')->group(function () {
 
     Route::post('/process-payment/{id}', function ($id) {
         $parcel = Parcel::find($id);
-        $parcel->is_paid = true;
-        $parcel->save();
+        if ($parcel) {
+            $parcel->is_paid = true;
+            $parcel->paid_at = now();
+            $parcel->save();
+        }
         return redirect('/student/dashboard')->with('success', 'Payment Successful!');
+    });
+
+    Route::post('/toggle-telegram', function () {
+        /** @var App\Models\Student|null $student */
+        $student = Auth::guard('student')->user();
+        if ($student instanceof Student) {
+            $student->chat_id = null;
+            $student->save();
+        }
+        return redirect('/student/dashboard')->with('success', 'Telegram notifications disabled.');
     });
 });
 
@@ -142,12 +181,12 @@ Route::get('/admin/check-student/{phone}', function ($phone) {
 
 Route::get('/setup-shelves', function () {
     $rows = ['A', 'B', 'C'];
-    $cols = 10; 
+    $cols = 9;
     foreach ($rows as $row) {
         for ($i = 1; $i <= $cols; $i++) {
-            $label = $row . '-' . str_pad($i, 2, '0', STR_PAD_LEFT);
+            $label = $row . '-' . $i;
             Shelf::firstOrCreate(['label' => $label]);
         }
     }
-    return "Shelves Created! (A-01 to C-10)";
+    return "Shelves Created! (A-1 to C-9)";
 });

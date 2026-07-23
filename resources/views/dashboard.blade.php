@@ -93,7 +93,7 @@
                         <tr>
                             <th>Unique ID</th>
                             <th>Student ID</th>
-                            <th>Shelf Location</th>
+                            <th>Shelf ID</th>
                             <th>Status</th>
                             <th class="text-center">Action</th>
                         </tr>
@@ -106,7 +106,9 @@
                                 <a href="#" class="text-decoration-none text-dark" data-bs-toggle="modal" data-bs-target="#viewParcelModal" 
                                     data-unique-id="{{ $parcel->unique_id }}" data-tracking="{{ $parcel->tracking_number }}" 
                                     data-student="{{ $student ? $student->name : 'Unknown' }}" data-shelf="{{ $parcel->shelf_label }}"
-                                    data-time="{{ $parcel->created_at->format('d M Y, h:i A') }}">
+                                    data-arrival="{{ $parcel->created_at->format('d M Y, h:i A') }}"
+                                    data-paid-at="{{ optional($parcel->paid_at)->format('d M Y, h:i A') ?? 'Not Paid' }}"
+                                    data-delivered-at="{{ optional($parcel->collected_at)->format('d M Y, h:i A') ?? 'Not Delivered' }}">
                                     {{ $parcel->unique_id }} <i class="bi bi-info-circle small text-primary ms-1"></i>
                                 </a>
                                 <div class="text-muted small fw-normal" style="font-size: 10px;">{{ $parcel->tracking_number }}</div>
@@ -120,7 +122,7 @@
                             </td>
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editParcelModal" data-id="{{ $parcel->id }}" data-tracking="{{ $parcel->tracking_number }}" data-shelf="{{ $parcel->shelf_label }}" data-status="{{ $parcel->is_collected ? 'collected' : ($parcel->is_paid ? 'ready' : 'unpaid') }}"><i class="bi bi-pencil-square"></i></button>
+                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editParcelModal" data-id="{{ $parcel->id }}" data-unique-id="{{ $parcel->unique_id }}" data-tracking="{{ $parcel->tracking_number }}" data-student-id="{{ $parcel->student_id }}" data-shelf="{{ $parcel->shelf_label }}" data-status="{{ $parcel->is_collected ? 'collected' : ($parcel->is_paid ? 'ready' : 'unpaid') }}"><i class="bi bi-pencil-square"></i></button>
                                     
                                     <form action="/admin/delete-parcel/{{ $parcel->id }}" method="POST" onsubmit="return confirm('Delete this parcel?');" class="m-0">
                                         @csrf @method('DELETE') 
@@ -173,7 +175,10 @@
                 </div>
                 <div class="modal-body p-4">
                     <div id="collectScannerUI" class="text-center mb-3">
-                        <h4 id="collectStatus" class="text-success fw-bold">📷 Camera is ON...</h4>
+                        <div class="d-flex justify-content-center align-items-center mb-2 gap-2">
+                            <h4 id="collectStatus" class="text-success fw-bold">📷 Camera is ON...</h4>
+                            <span id="scannerActiveIndicator" class="badge bg-secondary text-white">Inactive</span>
+                        </div>
                         <p class="text-muted small">Show Unique ID to Dashcam</p>
                         <input type="text" id="displayUniqueId" class="form-control form-control-lg text-center bg-light mb-3" placeholder="Waiting for scan..." readonly>
                     </div>
@@ -190,7 +195,7 @@
                                     <td id="displayMatrix" class="fw-bold">-</td>
                                 </tr>
                                 <tr>
-                                    <th class="bg-light text-muted small">Shelf Location</th>
+                                    <th class="bg-light text-muted small">Shelf ID</th>
                                     <td id="displayShelf" class="fw-bold text-primary fs-5">-</td>
                                 </tr>
                             </tbody>
@@ -218,6 +223,9 @@
                         <p class="mb-1"><small class="text-muted">Tracking:</small> <span id="vTracking" class="fw-bold"></span></p>
                         <p class="mb-1"><small class="text-muted">Student:</small> <span id="vStudent" class="fw-bold"></span></p>
                         <p class="mb-1"><small class="text-muted">Shelf:</small> <span id="vShelf" class="fw-bold"></span></p>
+                        <p class="mb-1"><small class="text-muted">Arrival:</small> <span id="vArrival" class="fw-bold"></span></p>
+                        <p class="mb-1"><small class="text-muted">Payment:</small> <span id="vPayment" class="fw-bold"></span></p>
+                        <p class="mb-1"><small class="text-muted">Delivered:</small> <span id="vDelivered" class="fw-bold"></span></p>
                     </div>
                 </div>
             </div>
@@ -235,13 +243,30 @@
                     <form id="editParcelForm" method="POST">
                         @csrf 
                         @method('PUT')
-                        <input type="text" name="tracking_number" id="editTracking" class="form-control mb-3" required>
-                        <input type="text" name="shelf_label" id="editShelf" class="form-control mb-3" required>
-                        <select name="status" id="editStatus" class="form-select mb-4">
-                            <option value="unpaid">Unpaid</option>
-                            <option value="ready">Ready</option>
-                            <option value="collected">Delivered</option>
-                        </select>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Unique ID</label>
+                            <input type="text" id="editUniqueId" class="form-control" readonly disabled>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Tracking Number</label>
+                            <input type="text" name="tracking_number" id="editTracking" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Student ID</label>
+                            <input type="text" name="student_id" id="editStudentId" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Shelf Label</label>
+                            <input type="text" name="shelf_label" id="editShelf" class="form-control" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label small text-muted">Parcel Status</label>
+                            <select name="status" id="editStatus" class="form-select">
+                                <option value="unpaid">Unpaid</option>
+                                <option value="ready">Ready</option>
+                                <option value="collected">Delivered</option>
+                            </select>
+                        </div>
                         <button type="submit" class="btn btn-info w-100 rounded-pill fw-bold">Update</button>
                     </form>
                 </div>
@@ -275,6 +300,9 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>ID</th>
+                                    <th>Room No</th>
+                                    <th>IC Number</th>
+                                    <th>Phone</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -283,7 +311,21 @@
                                 <tr>
                                     <td>{{$s->name}}</td>
                                     <td>{{$s->student_id}}</td>
-                                    <td>
+                                    <td>{{$s->room_number}}</td>
+                                    <td>{{$s->ic_number}}</td>
+                                    <td>{{$s->phone}}</td>
+                                    <td class="d-flex gap-1">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-0"
+                                            onclick="openStudentEdit(this)"
+                                            data-id="{{ $s->id }}"
+                                            data-name="{{ $s->name }}"
+                                            data-student-id="{{ $s->student_id }}"
+                                            data-room-number="{{ $s->room_number }}"
+                                            data-ic-number="{{ $s->ic_number }}"
+                                            data-phone="{{ $s->phone }}"
+                                        >
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
                                         <form action="/admin/delete-student/{{ $s->id }}" method="POST" class="m-0" onsubmit="return confirm('Remove this student?');">
                                             @csrf 
                                             <button class="btn btn-outline-danger btn-sm px-2 py-0"><i class="bi bi-trash"></i></button>
@@ -299,8 +341,66 @@
         </div>
     </div>
 
+    <div class="modal fade" id="editStudentModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning border-0">
+                    <h5 class="modal-title">Edit Student Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="editStudentForm" method="POST">
+                        @csrf
+                        @method('PUT')
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" name="name" id="editStudentName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Matrix ID</label>
+                            <input type="text" name="student_id" id="editStudentMatrix" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Room No</label>
+                            <input type="text" name="room_number" id="editStudentRoom" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">IC Number</label>
+                            <input type="text" name="ic_number" id="editStudentIC" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="text" name="phone" id="editStudentPhone" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-warning w-100 rounded-pill fw-bold">Update Student</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    function openStudentEdit(button) {
+        const student = {
+            id: button.dataset.id,
+            name: button.dataset.name,
+            student_id: button.dataset.studentId,
+            room_number: button.dataset.roomNumber,
+            ic_number: button.dataset.icNumber,
+            phone: button.dataset.phone,
+        };
+
+        const form = document.getElementById('editStudentForm');
+        form.action = '/admin/update-student/' + student.id;
+        document.getElementById('editStudentName').value = student.name || '';
+        document.getElementById('editStudentMatrix').value = student.student_id || '';
+        document.getElementById('editStudentRoom').value = student.room_number || '';
+        document.getElementById('editStudentIC').value = student.ic_number || '';
+        document.getElementById('editStudentPhone').value = student.phone || '';
+        const modal = new bootstrap.Modal(document.getElementById('editStudentModal'));
+        modal.show();
+    }
     let pollInterval;
 
     // SweetAlert Intercepts
@@ -319,47 +419,131 @@
         });
     @endif
 
-    window.addEventListener('load', () => fetch('/api/scanner-reset'));
+    window.addEventListener('load', () => {
+        fetch('/api/scanner-reset');
+        connectScannerSocket();
+    });
 
     // --- SCANNER LOGIC ---
-    let addPolling = null;
-    let phonePolling = null;
+    let scannerSocket = null;
     let addModeReady = false;
+    let collectMode = false;
+    let pendingScannerCommand = null;
 
-    function startAddTrackingPoll() {
-        if (addPolling) clearInterval(addPolling);
-        addPolling = setInterval(() => {
-            fetch('/api/check-latest-tracking?t=' + new Date().getTime())
-            .then(res => res.json())
-            .then(data => {
-                if (data.tracking_number && !document.getElementById('scanTracking').value) {
-                    document.getElementById('scanTracking').value = data.tracking_number;
-                    document.getElementById('piAddStatus').innerText = "✅ Tracking scanned. Press ENTER to scan phone number.";
-                    addModeReady = true;
-                    if (phonePolling) {
-                        clearInterval(phonePolling);
-                        phonePolling = null;
-                    }
-                }
-            });
-        }, 1000);
+    function setScannerActive(active) {
+        const badge = document.getElementById('scannerActiveIndicator');
+        if (!badge) return;
+        badge.innerText = active ? 'Active' : 'Inactive';
+        badge.classList.toggle('bg-success', active);
+        badge.classList.toggle('bg-secondary', !active);
     }
 
-    function startAddPhonePoll() {
-        if (phonePolling) clearInterval(phonePolling);
-        phonePolling = setInterval(() => {
-            fetch('/api/check-latest-tracking?t=' + new Date().getTime())
-            .then(res => res.json())
-            .then(data => {
-                if (data.student_phone) {
-                    clearInterval(phonePolling);
-                    phonePolling = null;
-                    fetch('/api/scanner-reset');
-                    document.getElementById('scanPhone').value = data.student_phone;
-                    document.getElementById('piAddStatus').innerText = "✅ ALL SCANNED!";
+    function resetCollectScannerState(clearServerCache = false) {
+        collectMode = false;
+        if (document.getElementById('collectStatus')) document.getElementById('collectStatus').innerText = "📷 Camera is ON...";
+        if (document.getElementById('displayUniqueId')) document.getElementById('displayUniqueId').value = "";
+        if (document.getElementById('displayShelf')) document.getElementById('displayShelf').innerText = "-";
+        if (document.getElementById('displayName')) document.getElementById('displayName').innerText = "-";
+        if (document.getElementById('displayMatrix')) document.getElementById('displayMatrix').innerText = "-";
+        if (document.getElementById('foundParcelId')) document.getElementById('foundParcelId').value = "";
+        if (clearServerCache) {
+            fetch('/api/scanner-reset');
+        }
+    }
+
+    function connectScannerSocket() {
+        if (scannerSocket && (scannerSocket.readyState === WebSocket.OPEN || scannerSocket.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        scannerSocket = new WebSocket(`ws://${window.location.hostname}:8080`);
+
+        scannerSocket.addEventListener('open', () => {
+            setScannerActive(true);
+            scannerSocket.send(JSON.stringify({ type: 'identify', role: 'dashboard' }));
+            if (pendingScannerCommand) {
+                scannerSocket.send(JSON.stringify(pendingScannerCommand));
+                pendingScannerCommand = null;
+            }
+        });
+
+        scannerSocket.addEventListener('message', event => {
+            let data;
+            try {
+                data = JSON.parse(event.data);
+            } catch (error) {
+                return;
+            }
+
+            if (data.type === 'tracking_number') {
+                if (collectMode) {
+                    document.getElementById('collectStatus').innerText = "✅ Scanned. Looking up parcel...";
+                    fetch('/api/scan-parcel', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ tracking_number: data.tracking_number })
+                    })
+                    .then(res => res.json())
+                    .then(payload => {
+                        if (payload.status === 'success') {
+                            document.getElementById('displayUniqueId').value = payload.unique_id;
+                            document.getElementById('displayShelf').innerText = payload.location;
+                            document.getElementById('displayName').innerText = payload.student_name;
+                            document.getElementById('displayMatrix').innerText = payload.student_id;
+                            document.getElementById('foundParcelId').value = payload.id;
+                            document.getElementById('collectStatus').innerText = "✅ PARCEL RECOGNIZED!";
+                        } else {
+                            document.getElementById('collectStatus').innerText = payload.message || "⚠️ Parcel not found. Try again or press X to cancel.";
+                        }
+                    })
+                    .catch(() => {
+                        document.getElementById('collectStatus').innerText = "⚠️ Unable to lookup parcel. Try again.";
+                    });
+                    return;
                 }
-            });
-        }, 1000);
+
+                document.getElementById('scanTracking').value = data.tracking_number;
+                document.getElementById('piAddStatus').innerText = "✅ Tracking scanned. Press ENTER to scan phone number.";
+                addModeReady = true;
+            }
+
+            if (data.type === 'student_phone') {
+                document.getElementById('scanPhone').value = data.student_phone;
+                document.getElementById('piAddStatus').innerText = "✅ ALL SCANNED!";
+                addModeReady = false;
+                document.removeEventListener('keydown', handleAddModalKeydown);
+            }
+        });
+
+        scannerSocket.addEventListener('close', () => {
+            addModeReady = false;
+            setScannerActive(false);
+        });
+
+        scannerSocket.addEventListener('error', () => {
+            addModeReady = false;
+            setScannerActive(false);
+            if (document.getElementById('piAddStatus')) {
+                document.getElementById('piAddStatus').innerText = "⚠️ Unable to connect scanner websocket.";
+            }
+        });
+    }
+
+    function sendScannerSocket(data) {
+        if (!scannerSocket || scannerSocket.readyState === WebSocket.CLOSED || scannerSocket.readyState === WebSocket.CLOSING) {
+            scannerSocket = null;
+            connectScannerSocket();
+        }
+        if (scannerSocket.readyState === WebSocket.OPEN) {
+            scannerSocket.send(JSON.stringify(data));
+            return;
+        }
+        if (scannerSocket.readyState === WebSocket.CONNECTING) {
+            pendingScannerCommand = data;
+        }
     }
 
     function handleAddModalKeydown(event) {
@@ -371,59 +555,44 @@
         event.preventDefault();
         addModeReady = false;
         document.getElementById('piAddStatus').innerText = "📷 Scan phone number now...";
-
-        fetch('/api/scanner-trigger-add', { method: 'POST', headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'} });
-        startAddPhonePoll();
-        document.removeEventListener('keydown', handleAddModalKeydown);
+        sendScannerSocket({ type: 'trigger-phone-scan' });
     }
 
-    function triggerPiForAdd() {
+    async function triggerPiForAdd() {
+        collectMode = false;
+        document.removeEventListener('keydown', handleAddModalKeydown);
         document.getElementById('scanTracking').value = "";
         document.getElementById('scanPhone').value = "";
         document.getElementById('piAddStatus').innerText = "📷 Camera is ON for tracking scan...";
         addModeReady = false;
+        pendingScannerCommand = null;
 
-        fetch('/api/scanner-reset').then(() => {
-            fetch('/api/scanner-trigger-add', { method: 'POST', headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'} });
-        });
-
-        if (pollInterval) clearInterval(pollInterval);
-        if (addPolling) clearInterval(addPolling);
-        if (phonePolling) clearInterval(phonePolling);
-        pollInterval = null;
-        addPolling = null;
-        phonePolling = null;
-
-        startAddTrackingPoll();
-        document.addEventListener('keydown', handleAddModalKeydown);
+        // Arm the scanner in Laravel backend for Add mode first
+        try {
+            await fetch('/api/scanner-trigger-add', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+            
+            connectScannerSocket();
+            sendScannerSocket({ type: 'trigger-add' });
+            document.addEventListener('keydown', handleAddModalKeydown);
+        } catch (e) {
+            document.getElementById('piAddStatus').innerText = "❌ Error arming scanner backend.";
+        }
     }
 
-    function triggerPiCamera() {
-        document.getElementById('collectStatus').innerText = "📷 Camera is ON...";
-        document.getElementById('displayUniqueId').value = "";
-        document.getElementById('displayShelf').innerText = "-";
-        document.getElementById('displayName').innerText = "-";
-        document.getElementById('displayMatrix').innerText = "-";
+    async function triggerPiCamera() {
+        resetCollectScannerState(true);
+        collectMode = true;
+        addModeReady = false;
 
-        fetch('/api/scanner-reset').then(() => {
-            fetch('/api/scanner-trigger', { method: 'POST', headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'} });
-        });
+        // Arm the scanner in Laravel backend for Collect mode first
+        try {
+            await fetch('/api/scanner-trigger', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
 
-        if(pollInterval) clearInterval(pollInterval);
-        pollInterval = setInterval(() => {
-            fetch('/api/check-latest-scan').then(res => res.json()).then(data => {
-                if (data.found) {
-                    clearInterval(pollInterval);
-                    fetch('/api/scanner-reset'); 
-                    document.getElementById('displayUniqueId').value = data.unique_id; 
-                    document.getElementById('displayShelf').innerText = data.location;
-                    document.getElementById('displayName').innerText = data.student_name;
-                    document.getElementById('displayMatrix').innerText = data.student_id;
-                    document.getElementById('foundParcelId').value = data.id;
-                    document.getElementById('collectStatus').innerText = "✅ PARCEL RECOGNIZED!";
-                }
-            });
-        }, 1000);
+            connectScannerSocket();
+            sendScannerSocket({ type: 'trigger-collect' });
+        } catch (e) {
+            document.getElementById('collectStatus').innerText = "❌ Error arming scanner backend.";
+        }
     }
 
     function confirmFinalDelivery() {
@@ -454,14 +623,48 @@
         document.getElementById('vTracking').innerText = b.getAttribute('data-tracking');
         document.getElementById('vStudent').innerText = b.getAttribute('data-student');
         document.getElementById('vShelf').innerText = b.getAttribute('data-shelf');
+        document.getElementById('vArrival').innerText = b.getAttribute('data-arrival');
+        document.getElementById('vPayment').innerText = b.getAttribute('data-paid-at');
+        document.getElementById('vDelivered').innerText = b.getAttribute('data-delivered-at');
     });
+
+    const addModal = document.getElementById('addParcelModal');
+    if (addModal) {
+        addModal.addEventListener('show.bs.modal', () => {
+            collectMode = false;
+            document.removeEventListener('keydown', handleAddModalKeydown);
+            addModeReady = false;
+            pendingScannerCommand = null;
+            if(document.getElementById('scanTracking')) document.getElementById('scanTracking').value = "";
+            if(document.getElementById('scanPhone')) document.getElementById('scanPhone').value = "";
+            if(document.getElementById('piAddStatus')) document.getElementById('piAddStatus').innerText = "📷 Camera is ON for tracking scan...";
+        });
+        addModal.addEventListener('hide.bs.modal', () => {
+            sendScannerSocket({ type: 'cancel-scan' });
+            setScannerActive(false);
+        });
+    }
+
+    const collectModal = document.getElementById('scanCollectionModal');
+    if (collectModal) {
+        collectModal.addEventListener('show.bs.modal', () => {
+            resetCollectScannerState(true);
+        });
+        collectModal.addEventListener('hide.bs.modal', () => {
+            sendScannerSocket({ type: 'cancel-scan' });
+            resetCollectScannerState(true);
+            setScannerActive(false);
+        });
+    }
 
     const eModal = document.getElementById('editParcelModal');
     if (eModal) {
         eModal.addEventListener('show.bs.modal', e => {
             const b = e.relatedTarget;
-            document.getElementById('editParcelForm').action = '/api/update-parcel/' + b.getAttribute('data-id');
+            document.getElementById('editParcelForm').action = '/admin/update-parcel/' + b.getAttribute('data-id');
+            document.getElementById('editUniqueId').value = b.getAttribute('data-unique-id');
             document.getElementById('editTracking').value = b.getAttribute('data-tracking');
+            document.getElementById('editStudentId').value = b.getAttribute('data-student-id');
             document.getElementById('editShelf').value = b.getAttribute('data-shelf');
             document.getElementById('editStatus').value = b.getAttribute('data-status');
         });
@@ -469,14 +672,26 @@
 
     // KILL SWITCH: Reset Pi if modal cleared/closed
     document.querySelectorAll('.modal').forEach(m => {
-        m.addEventListener('hidden.bs.modal', () => { 
+        m.addEventListener('hidden.bs.modal', event => {
+            if (event.target && (event.target.id === 'addParcelModal' || event.target.id === 'scanCollectionModal')) {
+                sendScannerSocket({ type: 'cancel-scan' });
+                collectMode = false;
+                setScannerActive(false);
+            }
             if(pollInterval) clearInterval(pollInterval); 
             if(addPolling) clearInterval(addPolling);
             if(phonePolling) clearInterval(phonePolling);
             fetch('/api/scanner-reset'); 
+            addModeReady = false;
+            pendingScannerCommand = null;
             document.removeEventListener('keydown', handleAddModalKeydown);
             if(document.getElementById('scanTracking')) document.getElementById('scanTracking').value = "";
             if(document.getElementById('scanPhone')) document.getElementById('scanPhone').value = "";
+            if(document.getElementById('displayUniqueId')) document.getElementById('displayUniqueId').value = "";
+            if(document.getElementById('displayShelf')) document.getElementById('displayShelf').innerText = "-";
+            if(document.getElementById('displayName')) document.getElementById('displayName').innerText = "-";
+            if(document.getElementById('displayMatrix')) document.getElementById('displayMatrix').innerText = "-";
+            if(document.getElementById('foundParcelId')) document.getElementById('foundParcelId').value = "";
             if(document.getElementById('piAddStatus')) document.getElementById('piAddStatus').innerText = "Waiting for Scan...";
         });
     });

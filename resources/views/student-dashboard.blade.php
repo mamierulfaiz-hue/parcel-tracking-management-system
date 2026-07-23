@@ -219,12 +219,16 @@
                         <i class="fa-regular fa-bell"></i>
                     </a>
                 @else
-                    <button class="btn btn-success btn-sm rounded-pill px-3 fw-bold shadow-sm d-none d-sm-block" disabled>
-                        <i class="fa-solid fa-bell me-1"></i> Alerts On
-                    </button>
-                    <button class="btn btn-success btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center d-sm-none" disabled style="width: 35px; height: 35px;">
-                        <i class="fa-solid fa-bell"></i>
-                    </button>
+                    <form action="/student/toggle-telegram" method="POST" class="m-0">
+                        @csrf
+                        <button type="submit" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold shadow-sm d-none d-sm-inline-flex align-items-center">
+                            <i class="fa-solid fa-bell-slash me-1"></i> Disable Alerts
+                        </button>
+                        <button type="submit" class="btn btn-danger btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center d-sm-none" style="width: 35px; height: 35px;">
+                            <i class="fa-solid fa-bell-slash"></i>
+                        </button>
+                    </form>
+                    <span class="badge bg-success text-white ms-2 d-none d-sm-inline-flex">Alerts On</span>
                 @endif
 
                 <form action="/student/logout" method="POST" class="m-0">
@@ -331,12 +335,14 @@
                                 <i class="fa-regular fa-calendar text-secondary"></i> 
                                 <span>Arrived: <span class="fw-bold text-dark">{{ $parcel->created_at->format('d M Y, h:i A') }}</span></span>
                             </div>
-                            @if($parcel->is_collected)
-                                <div class="d-flex align-items-center gap-2 text-muted mt-2" style="font-size: 13px;">
-                                    <i class="fa-solid fa-check-double text-success"></i> 
-                                    <span>Cleared: <span class="fw-bold text-dark">{{ $parcel->updated_at->format('d M Y') }}</span></span>
-                                </div>
-                            @endif
+                            <div class="d-flex align-items-center gap-2 text-muted mt-2" style="font-size: 13px;">
+                                <i class="fa-solid fa-credit-card text-primary"></i> 
+                                <span>Paid: <span class="fw-bold text-dark">{{ optional($parcel->paid_at)->format('d M Y, h:i A') ?? 'Pending' }}</span></span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 text-muted mt-2" style="font-size: 13px;">
+                                <i class="fa-solid fa-truck-fast text-success"></i> 
+                                <span>Delivered: <span class="fw-bold text-dark">{{ optional($parcel->collected_at)->format('d M Y, h:i A') ?? 'Not Delivered' }}</span></span>
+                            </div>
                         </div>
 
                         <div class="card-footer-clean">

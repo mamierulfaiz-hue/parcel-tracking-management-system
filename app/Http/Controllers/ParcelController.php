@@ -7,7 +7,9 @@ use App\Models\Parcel;
 use App\Models\Shelf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Telegram\Bot\Laravel\Facades\Telegram;
 
 class ParcelController extends Controller
 {
@@ -76,8 +78,8 @@ public function store(Request $request)
         $uniqueId = 'P-' . strtoupper(Str::random(4));
     } while (Parcel::where('unique_id', $uniqueId)->exists());
 
-    // 6. Find shelf
-    $assignedShelf = Shelf::where('is_occupied', false)->orderBy('label', 'asc')->first();
+    // 6. Find shelf with numeric ordering by row and slot number
+    $assignedShelf = $this->getLowestEmptyShelf();
 
     if ($assignedShelf) {
         $shelfLabel = $assignedShelf->label;
@@ -88,7 +90,7 @@ public function store(Request $request)
     }
 
     // 7. CREATE THE DATABASE TRANSACTION ROW
-    Parcel::create([
+    $parcel = Parcel::create([
         'unique_id' => $uniqueId,
         'tracking_number' => $request->tracking_number,
         'student_phone' => $request->student_phone,
@@ -96,7 +98,22 @@ public function store(Request $request)
         'shelf_label' => $shelfLabel,
         'is_paid' => false,
         'is_collected' => false,
+        'paid_at' => null,
+        'collected_at' => null,
     ]);
+
+    if (!empty($student->chat_id)) {
+        try {
+            Telegram::sendMessage([
+                'chat_id' => $student->chat_id,
+                'text' => "📦 Hi {$student->name}, your parcel has arrived!\n" .
+                          "Tracking: {$parcel->tracking_number}\n\n" .
+                          "Please pay and collect it as soon as possible."
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Telegram notification failed for student ' . $student->student_id . ': ' . $e->getMessage());
+        }
+    }
 
     $this->clearScannerCaches();
 
@@ -135,6 +152,22 @@ public function store(Request $request)
         return response()->json($data);
     }
 
+    private function getLowestEmptyShelf()
+    {
+        if (Shelf::count() === 0) {
+            foreach (['A', 'B', 'C'] as $row) {
+                for ($i = 1; $i <= 9; $i++) {
+                    Shelf::create(['label' => $row . '-' . $i]);
+                }
+            }
+        }
+
+        return Shelf::where('is_occupied', false)
+            ->orderByRaw("SUBSTRING_INDEX(label, '-', 1) ASC")
+            ->orderByRaw("CAST(SUBSTRING_INDEX(label, '-', -1) AS UNSIGNED) ASC")
+            ->first();
+    }
+
     private function clearScannerCaches()
     {
         Cache::forget('latest_scan_data');
@@ -150,26 +183,46 @@ public function store(Request $request)
         $parcel = Parcel::find($id);
         if (!$parcel) return redirect()->back()->withErrors(['msg' => 'Parcel not found!']);
 
+        $request->validate([
+            'tracking_number' => 'required|string',
+            'student_id' => 'required|string',
+            'shelf_label' => 'required|string',
+            'status' => 'required|in:unpaid,ready,collected',
+        ]);
+
         $oldShelfLabel = $parcel->shelf_label;
+        $newShelfLabel = $request->shelf_label;
+
         $parcel->tracking_number = $request->tracking_number;
-        $parcel->shelf_label = $request->shelf_label;
+        $parcel->student_id = $request->student_id;
+        $parcel->shelf_label = $newShelfLabel;
 
         $status = $request->status;
-        if ($status == 'unpaid' || $status == 'ready') {
-            $parcel->is_paid = ($status == 'ready');
+        if ($status === 'unpaid') {
+            $parcel->is_paid = false;
             $parcel->is_collected = false;
-            
-            // If the admin manually edits the shelf location label string
-            if ($oldShelfLabel !== $request->shelf_label) {
-                Shelf::where('label', $oldShelfLabel)->update(['is_occupied' => false]);
-                Shelf::where('label', $request->shelf_label)->update(['is_occupied' => true]);
-            }
-        } elseif ($status == 'collected') {
+            $parcel->paid_at = null;
+            $parcel->collected_at = null;
+        } elseif ($status === 'ready') {
+            $parcel->is_paid = true;
+            $parcel->is_collected = false;
+            $parcel->paid_at = $parcel->paid_at ?? now();
+            $parcel->collected_at = null;
+        } else {
             $parcel->is_paid = true;
             $parcel->is_collected = true;
+            $parcel->paid_at = $parcel->paid_at ?? now();
+            $parcel->collected_at = $parcel->collected_at ?? now();
+        }
 
-            // Free up the shelf space immediately if marked delivered manually
-            Shelf::where('label', $parcel->shelf_label)->update(['is_occupied' => false]);
+        if ($oldShelfLabel !== $newShelfLabel) {
+            Shelf::where('label', $oldShelfLabel)->update(['is_occupied' => false]);
+        }
+
+        if ($status === 'collected') {
+            Shelf::where('label', $newShelfLabel)->update(['is_occupied' => false]);
+        } else {
+            Shelf::where('label', $newShelfLabel)->update(['is_occupied' => true]);
         }
 
         $parcel->save();
@@ -198,27 +251,42 @@ public function store(Request $request)
 
     public function triggerScanner() 
     {
-        Cache::put('pi_scanner_status', 'ready', 120);
+        Log::info("Scanner Arming: Setting status to ready.");
+        Cache::forget('latest_scan_data');
+        Cache::put('pi_scanner_status', 'ready', 600); // 10 minutes
         return response()->json(['message' => 'Scanner activated!']);
     }
 
     public function triggerScannerAdd() 
     {
+        Log::info("Scanner Arming (Add Mode): Setting status to ready_add.");
         Cache::forget('latest_scan_data');
         Cache::forget('latest_tracking_number');
         Cache::forget('latest_student_phone'); 
         Cache::forget('latest_tracking_data');
-        Cache::put('pi_scanner_status', 'ready_add', 120); 
+        Cache::put('pi_scanner_status', 'ready_add', 600);
         return response()->json(['message' => 'Scanner ready for Add mode! Caches cleared.']);
     }
 
 public function receiveScan(Request $request) 
 {
+    $status = Cache::get('pi_scanner_status', 'idle');
+    Log::info("Receive Scan Attempt: Current Status is [{$status}]");
+
     // Accept either tracking_number or unique_id from the scanner
     $scannedText = $request->input('tracking_number') ?? $request->input('unique_id'); 
+
+    if ($status !== 'ready' && $status !== 'ready_add') {
+        return response()->json([
+            'status' => 'error',
+            'message' => "Scanner is not armed (Current: {$status}). Reset first, then trigger a new scan."
+        ], 409);
+    }
     
-    // Find the parcel
-    $parcel = Parcel::where('unique_id', $scannedText)->first();
+    // Find the parcel by either internal Unique ID (P-XXXX) or original Tracking Number
+    $parcel = Parcel::where('unique_id', $scannedText)
+                    ->orWhere('tracking_number', $scannedText)
+                    ->first();
 
     if (!$parcel) {
         return response()->json(['status' => 'error', 'message' => 'ID not found'], 404);
@@ -227,25 +295,26 @@ public function receiveScan(Request $request)
     // Manually query the student table so it doesn't crash if relationships are missing
     $student = \App\Models\Student::where('student_id', $parcel->student_id)->first();
 
-    // Cache the complete data payload
+    // Do not persist collect scans in cache; return the live payload directly so
+    // the UI cannot rehydrate an old parcel after the modal is closed.
     Cache::forget('latest_scan_data');
-    Cache::put('latest_scan_data', [
-        'id' => $parcel->id,
-        'unique_id' => $parcel->unique_id, 
-        'tracking_number' => $parcel->tracking_number, 
-        'location' => $parcel->shelf_label ?? 'Counter',
-        'student_name' => $student ? $student->name : 'No Name Registered', 
-        'student_id' => $parcel->student_id ?? 'Unknown ID', 
-    ], 60);
 
-    Cache::put('pi_scanner_status', 'idle'); 
-    return response()->json(['status' => 'success']);
+    Cache::put('pi_scanner_status', 'idle');
+    $data = [
+        'id' => $parcel->id,
+        'unique_id' => $parcel->unique_id,
+        'tracking_number' => $parcel->tracking_number,
+        'location' => $parcel->shelf_label ?? 'Counter',
+        'student_name' => $student ? $student->name : 'No Name Registered',
+        'student_id' => $parcel->student_id ?? 'Unknown ID',
+    ];
+
+    return response()->json(array_merge(['status' => 'success'], $data));
 }
 
     public function checkLatestScan() 
     {
-        $data = Cache::get('latest_scan_data');
-        return $data ? response()->json(array_merge(['found' => true], $data)) : response()->json(['found' => false]);
+        return response()->json(['found' => false]);
     }
 
     public function confirmCollection($id)
@@ -254,6 +323,8 @@ public function receiveScan(Request $request)
         if ($parcel) {
             $parcel->is_collected = true;
             $parcel->is_paid = true;
+            $parcel->paid_at = $parcel->paid_at ?? now();
+            $parcel->collected_at = $parcel->collected_at ?? now();
             $parcel->save();
 
             // Free the shelf space immediately

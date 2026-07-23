@@ -17,6 +17,13 @@ class Parcel extends Model
         'student_id', 
         'shelf_label',
         'is_paid',
-        'is_collected'
+        'is_collected',
+        'paid_at',
+        'collected_at'
+    ];
+
+    protected $casts = [
+        'paid_at' => 'datetime',
+        'collected_at' => 'datetime',
     ];
 }

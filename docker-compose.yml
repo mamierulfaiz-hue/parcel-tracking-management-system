@@ -1,6 +1,8 @@
 services:
   db:
     image: mysql:8.0
+    ports:
+      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: secret
       MYSQL_DATABASE: parcel_system
@@ -38,6 +40,40 @@ services:
         condition: service_healthy
     volumes:
       - ./:/var/www/html
+
+  ws:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./:/app
+    ports:
+      - "8080:8080"
+    command: sh -c "npm install ws >/tmp/ws-install.log 2>&1 && node /app/ws-server.js"
+    depends_on:
+      app:
+        condition: service_started
+
+  telegram:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: local
+      APP_DEBUG: 'true'
+      APP_URL: http://localhost:6767
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: parcel_system
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      TELEGRAM_BOT_TOKEN: "8429451091:AAEVMdjBs3X0be_zkJad9Qbbj6u_7KSG0ac"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/var/www/html
+    command: sh -c "php artisan telegram:listen"
 
 volumes:
   db_data:

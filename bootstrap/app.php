@@ -18,7 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // 2. KEEP YOUR PREVIOUS CODE (Raspberry Pi CSRF)
         $middleware->validateCsrfTokens(except: [
             'api/scan-parcel',
-            'api/store-parcel',
+            'api/scanner-trigger',
+            'api/scanner-trigger-add',
+            'api/scanner-reset',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
