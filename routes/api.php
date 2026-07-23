@@ -2,105 +2,46 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Cache; // 👈 CRITICAL: Needed for temporary memory
+use Illuminate\Support\Facades\Cache; 
 use App\Http\Controllers\ParcelController;
-use App\Models\Parcel;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/user', function (Request $request) {
+Route::post('/scanner-reset', [App\Http\Controllers\ParcelController::class, 'scannerReset']);
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
-})->middleware('auth:sanctum');
+});
 
-// Standard Parcel Routes
-Route::get('/parcels', [ParcelController::class, 'index']);
-Route::post('/parcels', [ParcelController::class, 'store']);
+// ============================================================
+// 📸 RASPBERRY PI DASHCAM SCANNER ROUTES
+// ============================================================
+Route::get('/scanner-status', [ParcelController::class, 'scannerStatus']);
+Route::get('/scanner-reset', [ParcelController::class, 'scannerReset']);
 
+// --- COLLECT MODE ROUTES ---
+Route::post('/scanner-trigger', [ParcelController::class, 'triggerScanner']);
+Route::post('/scan-parcel', [ParcelController::class, 'receiveScan']);
+Route::get('/check-latest-scan', [ParcelController::class, 'checkLatestScan']);
+Route::post('/confirm-collection/{id}', [ParcelController::class, 'confirmCollection']);
 
-// ==========================================
-// 1️⃣ RASPBERRY PI SCANNER ROUTE
-// ==========================================
-Route::post('/scan-parcel', function (Request $request) {
+// --- ADD MODE ROUTES ---
+Route::post('/scanner-trigger-add', [ParcelController::class, 'triggerScannerAdd']);
+
+Route::post('/cache-tracking', function (Request $request) {
+    $tracking = $request->input('tracking_number');
+    $phone = $request->input('student_phone'); 
     
-    // 1. Get the Tracking Number from the Pi
-    $tracking_number = $request->input('tracking_number');
-
-    // 2. Find the Parcel
-    $parcel = Parcel::where('tracking_number', $tracking_number)->first();
-
-    // 3. Error Checking
-    if (!$parcel) {
-        return response()->json(['status' => 'error', 'message' => 'Parcel not found!'], 404);
+    if ($tracking) {
+        Cache::put('latest_tracking_number', $tracking, 60);
     }
-    if (!$parcel->is_paid) {
-        return response()->json(['status' => 'error', 'message' => 'Student has not paid yet!'], 400);
+    if ($phone) {
+        Cache::put('latest_student_phone', $phone, 60);
+        Cache::put('pi_scanner_status', 'idle'); 
     }
-    if ($parcel->is_collected) {
-        return response()->json(['status' => 'error', 'message' => 'Parcel already collected!'], 400);
-    }
+    return response()->json(['status' => 'success']);
+});
 
-    // 4. ✅ SUCCESS (But don't collect yet!)
-    // Instead of saving to DB, we save to CACHE for 30 seconds.
-    // This allows the laptop to "see" the scan without finalizing it.
-    Cache::put('latest_scan_id', $parcel->id, 30);
-
+Route::get('/check-latest-tracking', function () {
     return response()->json([
-        'status' => 'success', 
-        'message' => 'Ready for Confirmation', 
-        'student' => $parcel->student_id
+        'tracking_number' => Cache::get('latest_tracking_number'),
+        'student_phone' => Cache::get('latest_student_phone')
     ]);
-});
-
-
-// ==========================================
-// 2️⃣ POLLING ROUTE (Laptop Checks This)
-// ==========================================
-Route::get('/check-latest-scan', function () {
-    // 1. Check if the Pi put anything in the Cache recently
-    $id = Cache::get('latest_scan_id');
-
-    if ($id) {
-        // 2. If found, get the full details from Database
-        $parcel = Parcel::find($id);
-        
-        // Only return if it exists and hasn't been collected yet
-        if ($parcel && !$parcel->is_collected) {
-            return response()->json([
-                'found' => true,
-                'id' => $parcel->id,
-                'tracking_number' => $parcel->tracking_number,
-                'student_name' => $parcel->student_id, 
-                'location' => $parcel->shelf_label ?? 'Counter' 
-            ]);
-        }
-    }
-
-    // 3. If cache is empty, return false
-    return response()->json(['found' => false]);
-});
-
-
-// ==========================================
-// 3️⃣ CONFIRMATION ROUTE (Clicking the Button)
-// ==========================================
-Route::post('/confirm-collection/{id}', function ($id) {
-    // 1. Find the parcel
-    $parcel = Parcel::find($id);
-    
-    if ($parcel) {
-        // 2. Mark as collected PERMANENTLY
-        $parcel->is_collected = true;
-        $parcel->save();
-        
-        // 3. Clear the cache (so the popup doesn't appear again)
-        Cache::forget('latest_scan_id'); 
-        
-        return response()->json(['status' => 'success', 'message' => 'Collection Finalized']);
-    }
-    
-    return response()->json(['status' => 'error', 'message' => 'Parcel not found'], 404);
 });

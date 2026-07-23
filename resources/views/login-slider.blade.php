@@ -3,269 +3,295 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Portal | Parcel System</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <title>Login Portal | Smart Parcel System</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
-
         body {
-            background-color: #eef2f6;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #eef2f6 0%, #d9e2ec 100%);
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-direction: column;
-            height: 100vh;
+            margin: 0;
+            padding: 20px;
         }
 
-        .container {
-            background-color: #fff;
-            border-radius: 25px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        .login-card {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 450px;
+            padding: 40px;
             position: relative;
             overflow: hidden;
-            width: 900px;
-            max-width: 100%;
-            min-height: 550px;
         }
 
-        .container p { font-size: 14px; line-height: 24px; letter-spacing: 0.3px; margin: 20px 0; }
-        .container span { font-size: 13px; color: #666; margin-bottom: 15px; display: block;}
-        
-        .container button {
-            background-color: #0d6efd;
-            color: #fff;
-            font-size: 13px;
-            padding: 12px 45px;
-            border: 1px solid transparent;
-            border-radius: 8px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            margin-top: 15px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        
-        .container button:hover { background-color: #0b5ed7; }
-        
-        /* HIDDEN BUTTON (Inside Blue Box) */
-        .container button.hidden { 
-            background-color: transparent; 
-            border-color: #fff; 
-            color: #fff; /* Ensure text is white */
-        }
-        .container button.hidden:hover { background-color: rgba(255,255,255,0.1); }
-
-        .container form {
-            background-color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            padding: 0 50px;
-            height: 100%;
-            text-align: center;
-        }
-
-        .container input {
-            background-color: #f8f9fa;
-            border: 1px solid #ddd;
-            margin: 10px 0;
-            padding: 15px;
-            font-size: 14px;
-            border-radius: 8px;
-            width: 100%;
-            outline: none;
-        }
-
-        /* --- ANIMATION LOGIC --- */
-        .form-container {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            transition: all 0.6s ease-in-out;
-        }
-
-        .sign-in { left: 0; width: 50%; z-index: 2; }
-        .sign-up { left: 0; width: 50%; opacity: 0; z-index: 1; }
-
-        .container.active .sign-in { transform: translateX(100%); }
-        .container.active .sign-up { transform: translateX(100%); opacity: 1; z-index: 5; animation: move 0.6s; }
-
-        @keyframes move {
-            0%, 49.99% { opacity: 0; z-index: 1; }
-            50%, 100% { opacity: 1; z-index: 5; }
-        }
-
-        .toggle-container {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            width: 50%;
-            height: 100%;
-            overflow: hidden;
-            transition: all 0.6s ease-in-out;
-            border-radius: 100px 0 0 100px;
-            z-index: 1000;
-        }
-
-        .container.active .toggle-container {
-            transform: translateX(-100%);
-            border-radius: 0 100px 100px 0;
-        }
-
-        .toggle {
-            background: linear-gradient(to right, #4e73df, #224abe);
-            color: #fff;
-            position: relative;
-            left: -100%;
-            height: 100%;
-            width: 200%;
-            transform: translateX(0);
-            transition: all 0.6s ease-in-out;
-        }
-
-        .container.active .toggle { transform: translateX(50%); }
-
-        .toggle-panel {
-            position: absolute;
-            width: 50%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            padding: 0 30px;
-            text-align: center;
-            top: 0;
-            transform: translateX(0);
-            transition: all 0.6s ease-in-out;
-        }
-
-        /* --- FIX: FORCE TEXT WHITE IN BLUE BOX --- */
-        .toggle-panel h1 { color: #fff !important; margin-bottom: 10px; }
-        .toggle-panel p { color: #fff !important; }
-
-        .toggle-left { transform: translateX(-200%); }
-        .container.active .toggle-left { transform: translateX(0); }
-        .toggle-right { right: 0; transform: translateX(0); }
-        .container.active .toggle-right { transform: translateX(200%); }
-        
-        .error-msg { 
-            color: #dc3545; 
-            font-size: 13px; 
-            margin-top: 5px; 
-            background: #ffe6e6; 
-            padding: 5px 10px; 
-            border-radius: 5px; 
-            display: block;
-            width: 100%;
-        }
-
-        /* GLOBAL H1 (For the white part only) */
-        h1 { margin-bottom: 15px; color: #333; }
-        
-        .social-icons { margin: 15px 0; }
-        .social-icons a {
-            border: 1px solid #ccc;
+        /* Top Icon Styling */
+        .icon-circle {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #0d6efd 0%, #0043a8 100%);
+            color: white;
             border-radius: 50%;
-            display: inline-flex;
-            justify-content: center;
+            display: flex;
             align-items: center;
-            margin: 0 5px;
-            width: 45px;
-            height: 45px;
-            color: #333;
-            text-decoration: none;
-            font-size: 18px;
-            transition: 0.3s;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin: 0 auto 20px;
+            box-shadow: 0 5px 15px rgba(13, 110, 253, 0.3);
+            transition: transform 0.3s ease;
         }
-        .social-icons a:hover { background-color: #0d6efd; color: white; border-color: #0d6efd; }
+
+        /* Modern Pill Toggle Button */
+        .toggle-box {
+            background: #f1f5f9;
+            border-radius: 50px;
+            padding: 5px;
+            display: flex;
+            position: relative;
+            margin-bottom: 30px;
+            cursor: pointer;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            text-align: center;
+            padding: 10px 0;
+            font-weight: 600;
+            font-size: 14px;
+            color: #6c757d;
+            z-index: 2;
+            transition: color 0.3s ease;
+        }
+
+        .toggle-btn.active {
+            color: #fff;
+        }
+
+        /* The sliding blue background inside the toggle */
+        .toggle-slider {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: calc(50% - 5px);
+            height: calc(100% - 10px);
+            background: #0d6efd;
+            border-radius: 50px;
+            transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+            z-index: 1;
+        }
+
+        /* Move slider to the right when Admin is active */
+        .admin-active .toggle-slider {
+            transform: translateX(100%);
+        }
+
+        /* Form Inputs */
+        .form-floating > label {
+            color: #8898aa;
+            font-size: 14px;
+        }
+
+        .form-control {
+            border-radius: 12px;
+            border: 1.5px solid #e2e8f0;
+            background-color: #f8fafc;
+            padding: 1rem 0.75rem;
+        }
+
+        .form-control:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.1);
+            background-color: #fff;
+        }
+
+        /* Submit Button */
+        .btn-submit {
+            background: #0d6efd;
+            color: white;
+            border-radius: 12px;
+            padding: 14px;
+            font-weight: 600;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            transition: all 0.3s;
+            border: none;
+        }
+
+        .btn-submit:hover {
+            background: #0b5ed7;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(13, 110, 253, 0.25);
+        }
+
+        /* Smooth fade for form switching */
+        .form-section {
+            display: none;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .form-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .password-eye {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #6c757d;
+            z-index: 10;
+        }
+        
+        .password-eye:hover { color: #333; }
+
+        /* Responsive tweaks */
+        @media (max-width: 400px) {
+            .login-card { padding: 30px 20px; }
+        }
     </style>
 </head>
 <body>
 
-    <div class="container" id="container">
+    <div class="login-card">
         
-        <div class="form-container sign-up">
-            <form action="/login" method="POST">
-                @csrf
-                <h1>Admin Access</h1>
-                <div class="social-icons">
-                    <a href="#" class="icon"><i class="fa-solid fa-user-shield"></i></a>
-                </div>
-                <span>Use your admin email and password</span>
-                
-                <input type="email" name="email" placeholder="Admin Email" required>
-                <input type="password" name="password" placeholder="Password" required>
-                
-                @if($errors->has('msg'))
-                    <div class="error-msg">
-                        <i class="fa-solid fa-circle-exclamation"></i> {{ $errors->first('msg') }}
-                    </div>
-                @endif
-
-                <button type="submit">Login</button>
-            </form>
+        <div class="icon-circle" id="headerIcon">
+            <i class="bi bi-mortarboard-fill"></i>
+        </div>
+        <div class="text-center mb-4">
+            <h4 class="fw-bold mb-1 text-dark" id="headerTitle">Student Portal</h4>
+            <p class="text-muted small" style="font-size: 13px;">Login to access your parcel dashboard</p>
         </div>
 
-        <div class="form-container sign-in">
+        <div class="toggle-box" id="toggleBox" onclick="switchTab()">
+            <div class="toggle-slider"></div>
+            <div class="toggle-btn active" id="btnStudent">Student</div>
+            <div class="toggle-btn" id="btnAdmin">Admin</div>
+        </div>
+
+        <div class="form-section active" id="formStudent">
             <form action="/student/login" method="POST">
                 @csrf
-                <h1>Student Portal</h1>
-                <div class="social-icons">
-                    <a href="#" class="icon"><i class="fa-solid fa-graduation-cap"></i></a>
+                <div class="form-floating mb-3">
+                    <input type="text" name="student_id" class="form-control" id="studentId" placeholder="S12345" value="{{ old('student_id') }}" required>
+                    <label for="studentId"><i class="bi bi-person-badge me-2"></i>Student ID</label>
                 </div>
-                <span>Enter your Student ID to continue</span>
                 
-                <input type="text" name="student_id" placeholder="Student ID (e.g. S12345)" required>
-                <input type="password" name="password" placeholder="Password" required>
-                
-                @if($errors->has('msg'))
-                    <div class="error-msg">
-                        <i class="fa-solid fa-circle-exclamation"></i> {{ $errors->first('msg') }}
-                    </div>
-                @endif
+                <div class="form-floating mb-4 position-relative">
+                    <input type="password" name="password" class="form-control" id="studentPassword" placeholder="Password" required>
+                    <label for="studentPassword"><i class="bi bi-lock me-2"></i>Password</label>
+                    <i class="bi bi-eye-slash password-eye" onclick="toggleVisibility('studentPassword', this)"></i>
+                </div>
 
-                <button type="submit">Login</button>
+                <button type="submit" class="btn btn-submit w-100">Login as Student <i class="bi bi-arrow-right-short ms-1"></i></button>
             </form>
         </div>
 
-        <div class="toggle-container">
-            <div class="toggle">
+        <div class="form-section" id="formAdmin">
+            <form action="/login" method="POST">
+                @csrf
+                <div class="form-floating mb-3">
+                    <input type="email" name="email" class="form-control" id="adminEmail" placeholder="admin@example.com" value="{{ old('email') }}" required>
+                    <label for="adminEmail"><i class="bi bi-envelope me-2"></i>Admin Email</label>
+                </div>
                 
-                <div class="toggle-panel toggle-left">
-                    <h1>Are you a Student?</h1>
-                    <p>Access your parcel dashboard, check statuses, and pay fees.</p>
-                    <button class="hidden" id="login">Go to Student Login</button>
+                <div class="form-floating mb-4 position-relative">
+                    <input type="password" name="password" class="form-control" id="adminPassword" placeholder="Password" required>
+                    <label for="adminPassword"><i class="bi bi-lock me-2"></i>Password</label>
+                    <i class="bi bi-eye-slash password-eye" onclick="toggleVisibility('adminPassword', this)"></i>
                 </div>
 
-                <div class="toggle-panel toggle-right">
-                    <h1>Are you an Admin?</h1>
-                    <p>Switch here to manage the parcel system and track inventory.</p>
-                    <button class="hidden" id="register">Go to Admin Login</button>
-                </div>
-
-            </div>
+                <button type="submit" class="btn btn-submit w-100" style="background: #212529;">Login as Admin <i class="bi bi-arrow-right-short ms-1"></i></button>
+            </form>
         </div>
 
     </div>
 
     <script>
-        const container = document.getElementById('container');
-        const registerBtn = document.getElementById('register');
-        const loginBtn = document.getElementById('login');
+        const toggleBox = document.getElementById('toggleBox');
+        const formStudent = document.getElementById('formStudent');
+        const formAdmin = document.getElementById('formAdmin');
+        const btnStudent = document.getElementById('btnStudent');
+        const btnAdmin = document.getElementById('btnAdmin');
+        const headerIcon = document.getElementById('headerIcon');
+        const headerTitle = document.getElementById('headerTitle');
 
-        registerBtn.addEventListener('click', () => {
-            container.classList.add("active");
-        });
+        let isStudent = true;
 
-        loginBtn.addEventListener('click', () => {
-            container.classList.remove("active");
-        });
+        // Smart Form Switching Logic
+        function switchTab(forceAdmin = false) {
+            if (forceAdmin || isStudent) {
+                // Switch to Admin
+                toggleBox.classList.add('admin-active');
+                btnStudent.classList.remove('active');
+                btnAdmin.classList.add('active');
+                
+                formStudent.classList.remove('active');
+                formAdmin.classList.add('active');
+                
+                headerIcon.innerHTML = '<i class="bi bi-shield-lock-fill"></i>';
+                headerIcon.style.background = 'linear-gradient(135deg, #212529 0%, #495057 100%)';
+                headerIcon.style.boxShadow = '0 5px 15px rgba(33, 37, 41, 0.3)';
+                headerTitle.innerText = "Admin Access";
+                isStudent = false;
+            } else {
+                // Switch to Student
+                toggleBox.classList.remove('admin-active');
+                btnAdmin.classList.remove('active');
+                btnStudent.classList.add('active');
+                
+                formAdmin.classList.remove('active');
+                formStudent.classList.add('active');
+                
+                headerIcon.innerHTML = '<i class="bi bi-mortarboard-fill"></i>';
+                headerIcon.style.background = 'linear-gradient(135deg, #0d6efd 0%, #0043a8 100%)';
+                headerIcon.style.boxShadow = '0 5px 15px rgba(13, 110, 253, 0.3)';
+                headerTitle.innerText = "Student Portal";
+                isStudent = true;
+            }
+        }
+
+        // Show/Hide Password Feature
+        function toggleVisibility(inputId, icon) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            }
+        }
+
+        // Auto-switch to Admin tab if the page reloaded due to an Admin login error
+        @if(old('email'))
+            switchTab(true);
+        @endif
+
+        // SweetAlert2 Error Intercept
+        @if($errors->has('msg'))
+            Swal.fire({
+                icon: 'error',
+                title: 'Access Denied',
+                text: "{{ $errors->first('msg') }}",
+                confirmButtonColor: isStudent ? '#0d6efd' : '#212529',
+                customClass: { popup: 'rounded-4' }
+            });
+        @endif
     </script>
-
 </body>
 </html>

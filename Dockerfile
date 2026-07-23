@@ -18,7 +18,10 @@ ENV APP_ENV production
 ENV SKIP_COMPOSER 1
 ENV PHP_ERRORS_STDERR 1
 
-EXPOSE 80
+EXPOSE 6767
 
-# THE FIX: Run migration, then start the server
-CMD sh -c "php artisan migrate --force && /start.sh"
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# THE FIX: wait for MySQL, generate an app key, migrate tables, then start nginx/php-fpm
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
